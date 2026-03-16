@@ -1,0 +1,21 @@
+# Maven build folder
+target/
+
+# Jar files
+*.jar
+
+# Compiled class files
+*.class
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
