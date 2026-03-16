@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -20,12 +21,14 @@ import java.util.*;
 @RequiredArgsConstructor
 @Slf4j
 public class VendorService {
+
     private final VendorRepository vendorRepository;
     private final UserRepository userRepository;
 
     @Transactional
     @SuppressWarnings("unchecked")
     public Vendor createVendorProfile(UUID userId, Map<String, Object> data) {
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> EventoraException.notFound("User not found"));
 
@@ -60,6 +63,7 @@ public class VendorService {
     @Transactional
     @SuppressWarnings("unchecked")
     public Vendor updateVendorProfile(UUID vendorId, Map<String, Object> data) {
+
         Vendor vendor = vendorRepository.findById(vendorId)
                 .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
 
@@ -71,8 +75,11 @@ public class VendorService {
         if (data.containsKey("city")) vendor.setCity((String) data.get("city"));
         if (data.containsKey("pincode")) vendor.setPincode((String) data.get("pincode"));
         if (data.containsKey("googleMapsLink")) vendor.setGoogleMapsLink((String) data.get("googleMapsLink"));
-        if (data.containsKey("startingPrice") && data.get("startingPrice") != null)
+
+        if (data.containsKey("startingPrice") && data.get("startingPrice") != null) {
             vendor.setStartingPrice(new BigDecimal(data.get("startingPrice").toString()));
+        }
+
         if (data.containsKey("amenities")) vendor.setAmenities((List<String>) data.get("amenities"));
         if (data.containsKey("serviceSubtypes")) vendor.setServiceSubtypes((List<String>) data.get("serviceSubtypes"));
 
@@ -81,18 +88,36 @@ public class VendorService {
         return vendor;
     }
 
-    public Page<Vendor> getVendors(Vendor.ServiceCategory category, String city,
-                                    BigDecimal minPrice, BigDecimal maxPrice,
-                                    BigDecimal minRating, int page, int size) {
-        return vendorRepository.findVendorsWithFilters(category, city, minPrice, maxPrice, minRating,
-                PageRequest.of(page, size));
+    // ⭐ FIXED METHOD
+    public Page<Vendor> getVendors(Vendor.ServiceCategory category,
+                                  String city,
+                                  BigDecimal minPrice,
+                                  BigDecimal maxPrice,
+                                  BigDecimal minRating,
+                                  int page,
+                                  int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        return vendorRepository.findVendorsWithFilters(
+                category,
+                city,
+                minPrice,
+                maxPrice,
+                minRating,
+                Vendor.VendorStatus.ACTIVE,   // ⭐ VERY IMPORTANT FIX
+                pageable
+        );
     }
 
     public List<Vendor> getTopVendors(String city, int limit) {
+
         Pageable pageable = PageRequest.of(0, limit);
+
         if (city != null && !city.isEmpty()) {
             return vendorRepository.findTopVendorsByCity(city, pageable);
         }
+
         return vendorRepository.findTopRankedVendors(pageable);
     }
 
@@ -108,35 +133,45 @@ public class VendorService {
 
     @Transactional
     public Vendor approveVendor(UUID vendorId, UUID adminId) {
+
         Vendor vendor = getVendorById(vendorId);
         vendor.setStatus(Vendor.VendorStatus.ACTIVE);
         vendor.setApprovedAt(java.time.LocalDateTime.now());
+
         return vendorRepository.save(vendor);
     }
 
     @Transactional
     public Vendor rejectVendor(UUID vendorId, String reason) {
+
         Vendor vendor = getVendorById(vendorId);
         vendor.setStatus(Vendor.VendorStatus.REJECTED);
+
         return vendorRepository.save(vendor);
     }
 
     @Transactional
     public Vendor updateLogo(UUID vendorId, String logoUrl) {
+
         Vendor vendor = getVendorById(vendorId);
         vendor.setLogoUrl(logoUrl);
+
         return vendorRepository.save(vendor);
     }
 
     @Transactional
     public Vendor updateCoverBanner(UUID vendorId, String bannerUrl) {
+
         Vendor vendor = getVendorById(vendorId);
         vendor.setCoverBannerUrl(bannerUrl);
+
         return vendorRepository.save(vendor);
     }
 
     private void updateProfileCompletion(Vendor vendor) {
+
         int score = 0;
+
         if (vendor.getBusinessName() != null && !vendor.getBusinessName().isEmpty()) score += 10;
         if (vendor.getDescription() != null && !vendor.getDescription().isEmpty()) score += 15;
         if (vendor.getTagline() != null && !vendor.getTagline().isEmpty()) score += 5;
@@ -154,16 +189,19 @@ public class VendorService {
         vendorRepository.save(vendor);
     }
 
-    @Scheduled(fixedRate = 3600000) // every hour
+    @Scheduled(fixedRate = 3600000)
     @Transactional
     public void recalculateRankingScores() {
+
         log.info("Recalculating vendor ranking scores...");
         vendorRepository.updateAllRankingScores();
         log.info("Ranking scores updated");
     }
 
     public Map<String, Object> getVendorStats(UUID vendorId) {
+
         Vendor vendor = getVendorById(vendorId);
+
         return Map.of(
                 "avgRating", vendor.getAvgRating(),
                 "totalReviews", vendor.getTotalReviews(),
