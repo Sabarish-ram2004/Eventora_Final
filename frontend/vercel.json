@@ -1,8 +1,9 @@
 {
-  "rewrites": [
+  "routes": [
+    { "handle": "filesystem" },
     {
-      "source": "/api/(.*)",
-      "destination": "https://syncora-bvnf.onrender.com/api/$1"
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
