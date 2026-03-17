@@ -14,7 +14,7 @@ const ROLES = [
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1=form, 2=otp
-  const [form, setForm] = useState({ username:'', email:'', password:'', firstName:'', lastName:'', phone:'', role:'USER' })
+  const [form, setForm] = useState({ username: '', email: '', password: '', firstName: '', lastName: '', phone: '', role: 'USER' })
   const [otp, setOtp] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -23,13 +23,28 @@ export default function RegisterPage() {
 
   const handleRegister = async (e) => {
     e.preventDefault()
-    if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return }
+
+    if (form.password.length < 8) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
+
+    const payload = { ...form }
+
+    if (!payload.phone || payload.phone.trim() === '') {
+      delete payload.phone
+    }
+
     setLoading(true)
+
     try {
-      await register(form)
+      await register(payload)
       setStep(2)
-    } catch (err) { toast.error(err?.message || 'Registration failed') }
-    finally { setLoading(false) }
+    } catch (err) {
+      toast.error(err?.message || 'Registration failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleVerify = async (e) => {
@@ -60,8 +75,8 @@ export default function RegisterPage() {
     if (/[^A-Za-z0-9]/.test(p)) s++
     return s
   }
-  const strengthColor = ['','bg-red-500','bg-orange-500','bg-yellow-500','bg-green-500']
-  const strengthLabel = ['','Weak','Fair','Good','Strong']
+  const strengthColor = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500']
+  const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong']
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 pt-24 pb-12 relative overflow-hidden">
@@ -85,11 +100,10 @@ export default function RegisterPage() {
 
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-3 mb-8">
-            {[1,2].map(s => (
+            {[1, 2].map(s => (
               <div key={s} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  step >= s ? 'bg-brand-gold text-brand-navy' : 'glass text-gray-500'
-                }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step >= s ? 'bg-brand-gold text-brand-navy' : 'glass text-gray-500'
+                  }`}>
                   {step > s ? <FiCheck className="w-4 h-4" /> : s}
                 </div>
                 {s < 2 && <div className={`w-12 h-px ${step > s ? 'bg-brand-gold' : 'bg-white/10'}`} />}
@@ -104,12 +118,11 @@ export default function RegisterPage() {
                 {/* Role Selection */}
                 <div className="grid grid-cols-2 gap-3 mb-2">
                   {ROLES.map(r => (
-                    <button key={r.id} type="button" onClick={() => setForm({...form, role: r.id})}
-                      className={`p-4 rounded-2xl border transition-all text-center ${
-                        form.role === r.id
+                    <button key={r.id} type="button" onClick={() => setForm({ ...form, role: r.id })}
+                      className={`p-4 rounded-2xl border transition-all text-center ${form.role === r.id
                           ? 'border-brand-gold bg-brand-gold/10 shadow-lg shadow-brand-gold/10'
                           : 'glass border-white/10 hover:border-white/20'
-                      }`}>
+                        }`}>
                       <div className="text-2xl mb-1">{r.icon}</div>
                       <div className="font-semibold text-white text-sm font-body">{r.label}</div>
                       <div className="text-gray-500 text-xs font-body">{r.desc}</div>
@@ -118,11 +131,11 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {[['firstName','First Name',FiUser],['lastName','Last Name',FiUser]].map(([field, placeholder, Icon]) => (
+                  {[['firstName', 'First Name', FiUser], ['lastName', 'Last Name', FiUser]].map(([field, placeholder, Icon]) => (
                     <div key={field} className="relative">
                       <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input type="text" placeholder={placeholder} value={form[field]}
-                        onChange={e => setForm({...form, [field]: e.target.value})}
+                        onChange={e => setForm({ ...form, [field]: e.target.value })}
                         className="w-full input-glass rounded-xl pl-10 pr-3 py-3.5 text-sm font-body" />
                     </div>
                   ))}
@@ -131,28 +144,28 @@ export default function RegisterPage() {
                 <div className="relative">
                   <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input type="text" required placeholder="Username" value={form.username}
-                    onChange={e => setForm({...form, username: e.target.value.toLowerCase().replace(/\s/g,'')})}
+                    onChange={e => setForm({ ...form, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
                     className="w-full input-glass rounded-2xl pl-12 pr-4 py-4 font-body" />
                 </div>
 
                 <div className="relative">
                   <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input type="email" required placeholder="Email address" value={form.email}
-                    onChange={e => setForm({...form, email: e.target.value})}
+                    onChange={e => setForm({ ...form, email: e.target.value })}
                     className="w-full input-glass rounded-2xl pl-12 pr-4 py-4 font-body" />
                 </div>
 
                 <div className="relative">
                   <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input type="tel" placeholder="Phone (optional)" value={form.phone}
-                    onChange={e => setForm({...form, phone: e.target.value})}
+                    onChange={e => setForm({ ...form, phone: e.target.value })}
                     className="w-full input-glass rounded-2xl pl-12 pr-4 py-4 font-body" />
                 </div>
 
                 <div className="relative">
                   <FiLock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input type={showPass ? 'text' : 'password'} required placeholder="Password (min 8 chars)"
-                    value={form.password} onChange={e => setForm({...form, password: e.target.value})}
+                    value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     className="w-full input-glass rounded-2xl pl-12 pr-12 py-4 font-body" />
                   <button type="button" onClick={() => setShowPass(!showPass)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
@@ -163,7 +176,7 @@ export default function RegisterPage() {
                 {form.password && (
                   <div className="space-y-1.5">
                     <div className="flex gap-1">
-                      {[1,2,3,4].map(i => (
+                      {[1, 2, 3, 4].map(i => (
                         <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= strength() ? strengthColor[strength()] : 'bg-white/10'}`} />
                       ))}
                     </div>
@@ -191,7 +204,7 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <label className="text-gray-400 text-sm font-body block mb-2 text-center">Enter 6-digit OTP</label>
-                  <input type="text" required maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g,''))}
+                  <input type="text" required maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                     placeholder="• • • • • •"
                     className="w-full input-glass rounded-2xl px-4 py-5 text-center text-3xl font-mono tracking-[0.8em] font-bold" />
                 </div>
