@@ -1,13 +1,7 @@
 package com.eventora.dto.auth;
 
-import java.util.*;
-
 import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Getter
@@ -23,13 +17,12 @@ public class AuthResponse {
     @Builder.Default
     private String tokenType = "Bearer";
 
-    private Long userId;
+    private String userId;   // ⭐ FIXED
     private String username;
     private String email;
     private String role;
     private String fullName;
     private String profileImage;
     private boolean emailVerified;
-    private Long vendorId;
-
+    private String vendorId; // ⭐ also safer
 }

@@ -11,7 +11,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.*;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.*;
 
@@ -27,7 +27,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
 
-    @Value("${cors.allowed.origins}")
+    @Value("${cors.allowed.origins:*}")
     private String allowedOrigins;
 
     @Bean
@@ -35,38 +35,43 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
+
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .headers(headers -> headers
-                        .frameOptions(frame -> frame.sameOrigin())
-                        .contentTypeOptions(content -> {})
-                        .referrerPolicy(ref -> ref.policy(
-                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                )
+
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .authenticationProvider(authenticationProvider)
+
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+
                 .authorizeHttpRequests(auth -> auth
 
-                        // ⭐ PUBLIC
-                        .requestMatchers("/auth/**", "/public/**").permitAll()
+                        // ⭐ AUTH PUBLIC
+                        .requestMatchers("/auth/**").permitAll()
+
+                        // ⭐ PUBLIC RESOURCES
+                        .requestMatchers("/public/**").permitAll()
 
                         // ⭐ SWAGGER
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
 
-                        // ⭐ ACTUATOR
-                        .requestMatchers("/actuator/**").permitAll()
+                        // ⭐ ACTUATOR HEALTH ONLY (safer)
+                        .requestMatchers("/actuator/health").permitAll()
 
-                        // ⭐ PREFLIGHT
+                        // ⭐ CORS PREFLIGHT
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ⭐ ROLE
+                        // ⭐ ROLE SECURITY
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/vendor/**").hasAnyRole("VENDOR", "ADMIN")
 
                         .anyRequest().authenticated()
-                )
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+                );
 
         return http.build();
     }
@@ -75,14 +80,30 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-        configuration.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+
+        configuration.setAllowedOrigins(
+                Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .toList()
+        );
+
+        configuration.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+        );
+
         configuration.setAllowedHeaders(List.of("*"));
+
+        configuration.setExposedHeaders(
+                List.of("Authorization")
+        );
+
         configuration.setAllowCredentials(true);
+
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", configuration);
 
         return source;

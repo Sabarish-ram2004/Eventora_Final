@@ -7,7 +7,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        indexes = {
+                @Index(name = "idx_users_email", columnList = "email"),
+                @Index(name = "idx_users_username", columnList = "username")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -46,24 +52,9 @@ public class User {
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 
-    @Column(length = 100)
-    private String city;
-
-    @Column(length = 10)
-    private String pincode;
-
-    @Column(columnDefinition = "TEXT")
-    private String address;
-
-    @Column(name = "google_maps_link")
-    private String googleMapsLink;
-
     @Column(name = "is_email_verified")
     @Builder.Default
     private Boolean isEmailVerified = false;
-
-    @Column(name = "verification_token", length = 255)
-    private String verificationToken;
 
     @Column(name = "is_active")
     @Builder.Default
@@ -72,13 +63,12 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ⭐ Auto timestamps
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -90,11 +80,9 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    // ⭐ Computed full name (NOT part of builder)
     public String getFullName() {
-        return (firstName != null ? firstName : "") +
-                " " +
-                (lastName != null ? lastName : "");
+        return ((firstName != null ? firstName : "") + " " +
+                (lastName != null ? lastName : "")).trim();
     }
 
     public enum UserRole {

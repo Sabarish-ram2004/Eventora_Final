@@ -24,8 +24,12 @@ public class RegisterRequest {
     @Size(min = 8, max = 120, message = "Password must be at least 8 characters")
     private String password;
 
-    @Size(max = 120, message = "Full name is too long")
-    private String fullName;
+    @NotBlank(message = "First name is required")
+    @Size(max = 60)
+    private String firstName;
+
+    @Size(max = 60)
+    private String lastName;
 
     @Pattern(regexp = "^[0-9]{7,15}$", message = "Phone must be numeric (7–15 digits)")
     private String phone;

@@ -1,8 +1,8 @@
 package com.eventora.service;
 
-import com.eventora.dto.common.ApiResponse;
 import com.eventora.dto.auth.AuthResponse;
 import com.eventora.dto.auth.RegisterRequest;
+import com.eventora.dto.common.ApiResponse;
 import com.eventora.exception.EventoraException;
 import com.eventora.model.User;
 import com.eventora.repository.UserRepository;
@@ -34,24 +34,21 @@ public class AuthService {
     @Transactional
     public ApiResponse<String> register(RegisterRequest request) {
 
+        log.info("Register request for email: {}", request.getEmail());
+
         if (userRepository.existsByEmail(request.getEmail()))
             throw EventoraException.conflict("Email already registered");
 
         if (userRepository.existsByUsername(request.getUsername()))
             throw EventoraException.conflict("Username already taken");
 
-        // ⭐ split full name safely
-        String[] nameParts = request.getFullName() != null
-                ? request.getFullName().split(" ", 2)
-                : new String[]{"", ""};
-
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(User.UserRole.valueOf(request.getRole().toUpperCase()))
-                .firstName(nameParts[0])
-                .lastName(nameParts.length > 1 ? nameParts[1] : "")
+                .role(User.UserRole.valueOf(request.getRole()))   // role already validated in DTO
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
                 .phone(request.getPhone())
                 .isEmailVerified(false)
                 .isActive(true)
@@ -84,18 +81,25 @@ public class AuthService {
     // ⭐ LOGIN
     public ApiResponse<AuthResponse> login(String emailOrUsername, String password) {
 
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(emailOrUsername, password)
-        );
+        log.info("Login attempt: {}", emailOrUsername);
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(emailOrUsername, password)
+            );
+        } catch (Exception e) {
+            log.error("Authentication failed for {}", emailOrUsername);
+            throw EventoraException.unauthorized("Invalid credentials");
+        }
 
         User user = userRepository
                 .findByEmailOrUsername(emailOrUsername, emailOrUsername)
                 .orElseThrow(() -> EventoraException.notFound("User not found"));
 
-        if (!user.getIsActive())
+        if (!Boolean.TRUE.equals(user.getIsActive()))
             throw EventoraException.forbidden("Account suspended");
 
-        if (!user.getIsEmailVerified())
+        if (!Boolean.TRUE.equals(user.getIsEmailVerified()))
             throw EventoraException.forbidden("Please verify your email first");
 
         var authorities = List.of(
@@ -117,12 +121,12 @@ public class AuthService {
         AuthResponse response = AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .userId(user.getId() != null ? user.getId().getMostSignificantBits() : null)
+                .userId(user.getId().toString())   // ⭐ ensure DTO uses String
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .fullName(user.getFullName())
-                .emailVerified(user.getIsEmailVerified())
+                .emailVerified(Boolean.TRUE.equals(user.getIsEmailVerified()))
                 .build();
 
         return ApiResponse.success("Login successful", response);
