@@ -21,11 +21,11 @@ public class OtpService {
     private final SendGridEmailService sendGridEmailService;
     private final UserRepository userRepository;
 
-    @Value("${otp.expiry.minutes}")
-    private int otpExpiryMinutes;
-
-    @Value("${otp.length}")
+    @Value("${OTP_LENGTH}")
     private int otpLength;
+
+    @Value("${OTP_EXPIRY_MINUTES}")
+    private int expiry;
 
     private static final String OTP_PREFIX = "eventora:otp:";
 
@@ -35,7 +35,8 @@ public class OtpService {
         String key = OTP_PREFIX + type + ":" + email;
 
         redisTemplate.opsForValue()
-                .set(key, otp, otpExpiryMinutes, TimeUnit.MINUTES);
+                .set(key, otp, 
+                    expiry, TimeUnit.MINUTES);
 
         sendGridEmailService.sendOtpMail(email, otp, type);
 
