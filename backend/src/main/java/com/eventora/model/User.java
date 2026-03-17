@@ -7,8 +7,13 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "users")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
@@ -52,9 +57,14 @@ public class User {
     @Column(name = "google_maps_link")
     private String googleMapsLink;
 
+    // ⭐ EMAIL VERIFICATION STATUS
     @Column(name = "is_email_verified")
     @Builder.Default
     private Boolean isEmailVerified = false;
+
+    // ⭐ EMAIL VERIFICATION TOKEN
+    @Column(name = "verification_token", length = 255)
+    private String verificationToken;
 
     @Column(name = "is_active")
     @Builder.Default
@@ -81,6 +91,8 @@ public class User {
     }
 
     public enum UserRole {
-        USER, VENDOR, ADMIN
+        USER,
+        VENDOR,
+        ADMIN
     }
 }

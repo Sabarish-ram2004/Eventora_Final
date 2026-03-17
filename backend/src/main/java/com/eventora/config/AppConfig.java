@@ -23,13 +23,20 @@ public class AppConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return usernameOrEmail -> {
-            var user = userRepository.findByEmailOrUsername(usernameOrEmail, usernameOrEmail)
+
+            var user = userRepository
+                    .findByEmailOrUsername(usernameOrEmail, usernameOrEmail)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + usernameOrEmail));
+
+            // ⭐⭐⭐ VERY IMPORTANT CHECK ⭐⭐⭐
+            if (Boolean.FALSE.equals(user.getIsEmailVerified())) {
+                throw new UsernameNotFoundException("Please verify your email before login");
+            }
+
             return new org.springframework.security.core.userdetails.User(
                     user.getEmail(),
                     user.getPasswordHash(),
-                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
-            );
+                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
         };
     }
 
