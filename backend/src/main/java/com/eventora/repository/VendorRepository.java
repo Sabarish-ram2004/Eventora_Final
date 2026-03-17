@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.eventora.model.enums.VendorStatus;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -40,7 +40,7 @@ public interface VendorRepository extends JpaRepository<Vendor, UUID>, JpaSpecif
             @Param("minPrice") BigDecimal minPrice,
             @Param("maxPrice") BigDecimal maxPrice,
             @Param("minRating") BigDecimal minRating,
-            @Param("status") Vendor.VendorStatus status,
+            @Param("status") VendorStatus status,
             Pageable pageable
     );
 
@@ -87,5 +87,5 @@ public interface VendorRepository extends JpaRepository<Vendor, UUID>, JpaSpecif
         """)
     void updateAllRankingScores();
 
-    long countByStatus(Vendor.VendorStatus status);
+    long countByStatus(VendorStatus status);
 }

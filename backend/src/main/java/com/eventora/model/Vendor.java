@@ -6,7 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
-
+import com.eventora.model.enums.VendorStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -124,9 +124,5 @@ public class Vendor {
     @PreUpdate
     void onUpdate() {
         updatedAt = LocalDateTime.now();
-    }
-
-    public enum VendorStatus {
-        PENDING_APPROVAL, ACTIVE, SUSPENDED, REJECTED
     }
 }

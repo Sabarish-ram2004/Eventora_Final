@@ -13,7 +13,7 @@ import org.springframework.data.domain.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.eventora.model.enums.VendorStatus;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -59,7 +59,7 @@ public class VendorService {
                         : null)
                 .amenities((List<String>) data.getOrDefault("amenities", new ArrayList<>()))
                 .serviceSubtypes((List<String>) data.getOrDefault("serviceSubtypes", new ArrayList<>()))
-                .status(Vendor.VendorStatus.PENDING_APPROVAL)
+                .status(VendorStatus.PENDING_APPROVAL)
                 .build();
 
         updateProfileCompletion(vendor);
@@ -120,7 +120,7 @@ public class VendorService {
                 minPrice,
                 maxPrice,
                 minRating,
-                Vendor.VendorStatus.ACTIVE,
+                VendorStatus.ACTIVE,
                 pageable
         );
     }
@@ -150,7 +150,7 @@ public class VendorService {
     public Vendor approveVendor(UUID vendorId, UUID adminId) {
 
         Vendor vendor = getVendorById(vendorId);
-        vendor.setStatus(Vendor.VendorStatus.ACTIVE);
+        vendor.setStatus(VendorStatus.ACTIVE);
         vendor.setApprovedAt(java.time.LocalDateTime.now());
 
         return vendorRepository.save(vendor);
@@ -160,7 +160,7 @@ public class VendorService {
     public Vendor rejectVendor(UUID vendorId, String reason) {
 
         Vendor vendor = getVendorById(vendorId);
-        vendor.setStatus(Vendor.VendorStatus.REJECTED);
+        vendor.setStatus(VendorStatus.REJECTED);
 
         return vendorRepository.save(vendor);
     }

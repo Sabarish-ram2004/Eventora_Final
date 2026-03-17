@@ -1,5 +1,9 @@
 package com.eventora.model;
 
+import com.eventora.model.enums.BookingStatus;
+import com.eventora.model.enums.PaymentStatus;
+import com.eventora.model.enums.OccasionType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
@@ -130,31 +134,4 @@ public class Booking {
         updatedAt = LocalDateTime.now();
     }
 
-    public enum BookingStatus {
-        PENDING,
-        CONFIRMED,
-        REJECTED,
-        WAITLISTED,
-        CANCELLED,
-        COMPLETED
-    }
-
-    public enum PaymentStatus {
-        UNPAID,
-        ADVANCE_PAID,
-        PARTIALLY_PAID,
-        PAID,
-        REFUNDED
-    }
-
-    public enum OccasionType {
-        WEDDING,
-        BIRTHDAY,
-        CORPORATE,
-        ANNIVERSARY,
-        BABY_SHOWER,
-        GRADUATION,
-        FESTIVAL,
-        OTHER
-    }
 }

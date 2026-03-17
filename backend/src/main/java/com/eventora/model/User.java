@@ -1,5 +1,6 @@
 package com.eventora.model;
 
+import com.eventora.model.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -38,7 +39,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private UserRole role = UserRole.USER;
+    private Role role = Role.USER;
 
     @Column(name = "first_name", length = 100)
     private String firstName;
@@ -52,12 +53,12 @@ public class User {
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 
-    @Column(name = "is_email_verified")
     @Builder.Default
+    @Column(name = "is_email_verified")
     private Boolean isEmailVerified = false;
 
-    @Column(name = "is_active")
     @Builder.Default
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "last_login_at")
@@ -83,11 +84,5 @@ public class User {
     public String getFullName() {
         return ((firstName != null ? firstName : "") + " " +
                 (lastName != null ? lastName : "")).trim();
-    }
-
-    public enum UserRole {
-        USER,
-        VENDOR,
-        ADMIN
     }
 }

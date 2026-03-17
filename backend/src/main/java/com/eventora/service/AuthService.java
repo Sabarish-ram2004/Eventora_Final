@@ -46,7 +46,7 @@ public class AuthService {
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(User.UserRole.valueOf(request.getRole().name()))   // role already validated in DTO
+                .role(request.getRole())
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .phone(request.getPhone())
@@ -59,8 +59,7 @@ public class AuthService {
         otpService.sendOtp(user.getEmail(), "REGISTRATION");
 
         return ApiResponse.success(
-                "Registration successful. OTP sent to " + user.getEmail()
-        );
+                "Registration successful. OTP sent to " + user.getEmail());
     }
 
     // ⭐ VERIFY EMAIL
@@ -85,8 +84,7 @@ public class AuthService {
 
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(emailOrUsername, password)
-            );
+                    new UsernamePasswordAuthenticationToken(emailOrUsername, password));
         } catch (Exception e) {
             log.error("Authentication failed for {}", emailOrUsername);
             throw EventoraException.unauthorized("Invalid credentials");
@@ -103,14 +101,12 @@ public class AuthService {
             throw EventoraException.forbidden("Please verify your email first");
 
         var authorities = List.of(
-                new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
-        );
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
 
         var userDetails = new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPasswordHash(),
-                authorities
-        );
+                authorities);
 
         String accessToken = jwtService.generateToken(userDetails);
         String refreshToken = jwtService.generateRefreshToken(userDetails);
@@ -121,7 +117,7 @@ public class AuthService {
         AuthResponse response = AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .userId(user.getId().toString())   // ⭐ ensure DTO uses String
+                .userId(user.getId().toString()) // ⭐ ensure DTO uses String
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().name())

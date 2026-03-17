@@ -1,6 +1,8 @@
 package com.eventora.service;
 
+import java.util.List;
 import com.eventora.dto.booking.CreateBookingRequest;
+import com.eventora.model.enums.*;
 import com.eventora.dto.booking.UpdateBookingStatusRequest;
 import com.eventora.dto.common.ApiResponse;
 import com.eventora.exception.EventoraException;
@@ -28,179 +30,168 @@ import java.util.UUID;
 @Slf4j
 public class BookingService {
 
-    private final BookingRepository bookingRepository;
-    private final VendorRepository vendorRepository;
-    private final UserRepository userRepository;
-    //private final ServiceCategoryRepository categoryRepository;
+        private final BookingRepository bookingRepository;
+        private final VendorRepository vendorRepository;
+        private final UserRepository userRepository;
+        // private final ServiceCategoryRepository categoryRepository;
 
-    // ⭐ CREATE BOOKING
-    @Transactional
-    public ApiResponse<String> createBooking(String username, CreateBookingRequest request) {
+        // ⭐ CREATE BOOKING
+        @Transactional
+        public ApiResponse<String> createBooking(String username, CreateBookingRequest request) {
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> EventoraException.notFound("User not found"));
+                User user = userRepository.findByUsername(username)
+                                .orElseThrow(() -> EventoraException.notFound("User not found"));
 
-        Vendor vendor = vendorRepository.findById(request.getVendorId())
-                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
+                Vendor vendor = vendorRepository.findById(request.getVendorId())
+                                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
 
-        if (vendor.getStatus() != Vendor.VendorStatus.ACTIVE) {
-            throw EventoraException.badRequest("Vendor is not accepting bookings");
+                if (vendor.getStatus() != VendorStatus.ACTIVE) {
+                        throw EventoraException.badRequest("Vendor is not accepting bookings");
+                }
+
+                ServiceCategory category = vendor.getCategory();
+
+                // ⭐ duplicate booking rule
+                if (bookingRepository.userHasBookingOnDate(
+                                user.getId(),
+                                category,
+                                request.getEventDate(),
+                                List.of(BookingStatus.CANCELLED, BookingStatus.REJECTED))) {
+
+                        throw EventoraException.conflict(
+                                        "You already have a booking in this category on selected date");
+                }
+
+                // ⭐ vendor slot check
+                boolean vendorBusy = bookingRepository.vendorHasBookingOnDate(
+                                vendor.getId(),
+                                request.getEventDate());
+
+                BookingStatus status = vendorBusy
+                                ? BookingStatus.WAITLISTED
+                                : BookingStatus.PENDING;
+
+                Booking booking = Booking.builder()
+                                .user(user)
+                                .vendor(vendor)
+                                .category(category)
+                                .eventDate(request.getEventDate())
+                                .venueAddress(request.getVenueAddress())
+                                .specialRequirements(request.getNotes())
+                                .status(status)
+                                .build();
+
+                bookingRepository.save(booking);
+
+                // ⭐ null safe increment
+                vendor.setTotalBookings(
+                                vendor.getTotalBookings() == null
+                                                ? 1
+                                                : vendor.getTotalBookings() + 1);
+
+                vendorRepository.save(vendor);
+
+                return ApiResponse.success(
+                                "Booking created successfully",
+                                booking.getBookingReference());
         }
 
-        ServiceCategory category = vendor.getCategory();
+        // ⭐ UPDATE BOOKING STATUS
+        @Transactional
+        public ApiResponse<String> updateBookingStatus(
+                        UUID bookingId,
+                        String username,
+                        UpdateBookingStatusRequest request) {
 
-        // ⭐ duplicate booking rule
-        if (bookingRepository.userHasBookingOnDate(
-                user.getId(),
-                category,
-                request.getEventDate())) {
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> EventoraException.notFound("Booking not found"));
 
-            throw EventoraException.conflict(
-                    "You already have a booking in this category on selected date");
+                if (!booking.getVendor().getUser().getUsername().equals(username)) {
+                        throw EventoraException.forbidden("Not allowed");
+                }
+
+                BookingStatus newStatus = BookingStatus.valueOf(request.getStatus());
+
+                BookingStatus current = booking.getStatus();
+
+                // ⭐ state machine validation
+                if (current == BookingStatus.COMPLETED ||
+                                current == BookingStatus.CANCELLED ||
+                                current == BookingStatus.REJECTED) {
+                        throw EventoraException.badRequest("Booking already finalized");
+                }
+
+                booking.setStatus(newStatus);
+                booking.setVendorNotes(request.getNotes());
+
+                if (newStatus == BookingStatus.CONFIRMED) {
+                        booking.setConfirmedAt(LocalDateTime.now());
+                }
+                if (newStatus == BookingStatus.CANCELLED) {
+                        booking.setCancelledAt(LocalDateTime.now());
+                }
+                if (newStatus == BookingStatus.COMPLETED) {
+                        booking.setCompletedAt(LocalDateTime.now());
+                }
+
+                bookingRepository.save(booking);
+
+                return ApiResponse.success("Booking status updated");
         }
 
-        // ⭐ vendor slot check
-        boolean vendorBusy =
-                bookingRepository.vendorHasBookingOnDate(
-                        vendor.getId(),
-                        request.getEventDate()
-                );
+        // ⭐ USER BOOKINGS
+        public ApiResponse<Page<Booking>> getUserBookings(String username, int page, int size) {
 
-        Booking.BookingStatus status =
-                vendorBusy
-                        ? Booking.BookingStatus.WAITLISTED
-                        : Booking.BookingStatus.PENDING;
+                User user = userRepository.findByUsername(username)
+                                .orElseThrow(() -> EventoraException.notFound("User not found"));
 
-        Booking booking = Booking.builder()
-                .user(user)
-                .vendor(vendor)
-                .category(category)
-                .eventDate(request.getEventDate())
-                .venueAddress(request.getVenueAddress())
-                .specialRequirements(request.getNotes())
-                .status(status)
-                .build();
+                Page<Booking> bookings = bookingRepository.findByUser_IdOrderByCreatedAtDesc(
+                                user.getId(),
+                                PageRequest.of(page, size));
 
-        bookingRepository.save(booking);
-
-        // ⭐ null safe increment
-        vendor.setTotalBookings(
-                vendor.getTotalBookings() == null
-                        ? 1
-                        : vendor.getTotalBookings() + 1
-        );
-
-        vendorRepository.save(vendor);
-
-        return ApiResponse.success(
-                "Booking created successfully",
-                booking.getBookingReference()
-        );
-    }
-
-    // ⭐ UPDATE BOOKING STATUS
-    @Transactional
-    public ApiResponse<String> updateBookingStatus(
-            UUID bookingId,
-            String username,
-            UpdateBookingStatusRequest request) {
-
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> EventoraException.notFound("Booking not found"));
-
-        if (!booking.getVendor().getUser().getUsername().equals(username)) {
-            throw EventoraException.forbidden("Not allowed");
+                return ApiResponse.success(bookings);
         }
 
-        Booking.BookingStatus newStatus =
-                Booking.BookingStatus.valueOf(request.getStatus());
+        // ⭐ VENDOR BOOKINGS
+        public ApiResponse<Page<Booking>> getVendorBookings(String username, int page, int size) {
 
-        Booking.BookingStatus current = booking.getStatus();
+                Vendor vendor = vendorRepository.findByUserUsername(username)
+                                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
 
-        // ⭐ state machine validation
-        if (current == Booking.BookingStatus.COMPLETED ||
-                current == Booking.BookingStatus.CANCELLED ||
-                current == Booking.BookingStatus.REJECTED) {
-            throw EventoraException.badRequest("Booking already finalized");
+                Page<Booking> bookings = bookingRepository.findByVendor_IdOrderByCreatedAtDesc(
+                                vendor.getId(),
+                                PageRequest.of(page, size));
+
+                return ApiResponse.success(bookings);
         }
 
-        booking.setStatus(newStatus);
-        booking.setVendorNotes(request.getNotes());
+        // ⭐ GET BOOKING BY REF
+        public ApiResponse<Booking> getBookingByReference(String reference) {
 
-        if (newStatus == Booking.BookingStatus.CONFIRMED) {
-            booking.setConfirmedAt(LocalDateTime.now());
-        }
-        if (newStatus == Booking.BookingStatus.CANCELLED) {
-            booking.setCancelledAt(LocalDateTime.now());
-        }
-        if (newStatus == Booking.BookingStatus.COMPLETED) {
-            booking.setCompletedAt(LocalDateTime.now());
+                Booking booking = bookingRepository.findByBookingReference(reference)
+                                .orElseThrow(() -> EventoraException.notFound("Booking not found"));
+
+                return ApiResponse.success(booking);
         }
 
-        bookingRepository.save(booking);
+        // ⭐ VENDOR EARNINGS
+        public ApiResponse<EarningsDto> getVendorEarnings(String username) {
 
-        return ApiResponse.success("Booking status updated");
-    }
+                Vendor vendor = vendorRepository.findByUserUsername(username)
+                                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
 
-    // ⭐ USER BOOKINGS
-    public ApiResponse<Page<Booking>> getUserBookings(String username, int page, int size) {
+                LocalDate month = LocalDate.now().minusMonths(1);
+                LocalDate year = LocalDate.now().minusYears(1);
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> EventoraException.notFound("User not found"));
+                BigDecimal monthly = bookingRepository.getTotalEarnings(vendor.getId(), month);
 
-        Page<Booking> bookings =
-                bookingRepository.findByUser_IdOrderByCreatedAtDesc(
-                        user.getId(),
-                        PageRequest.of(page, size)
-                );
+                BigDecimal yearly = bookingRepository.getTotalEarnings(vendor.getId(), year);
 
-        return ApiResponse.success(bookings);
-    }
+                return ApiResponse.success(
+                                "Vendor earnings fetched",
+                                new EarningsDto(monthly, yearly));
+        }
 
-    // ⭐ VENDOR BOOKINGS
-    public ApiResponse<Page<Booking>> getVendorBookings(String username, int page, int size) {
-
-        Vendor vendor = vendorRepository.findByUserUsername(username)
-                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
-
-        Page<Booking> bookings =
-                bookingRepository.findByVendor_IdOrderByCreatedAtDesc(
-                        vendor.getId(),
-                        PageRequest.of(page, size)
-                );
-
-        return ApiResponse.success(bookings);
-    }
-
-    // ⭐ GET BOOKING BY REF
-    public ApiResponse<Booking> getBookingByReference(String reference) {
-
-        Booking booking = bookingRepository.findByBookingReference(reference)
-                .orElseThrow(() -> EventoraException.notFound("Booking not found"));
-
-        return ApiResponse.success(booking);
-    }
-
-    // ⭐ VENDOR EARNINGS
-    public ApiResponse<EarningsDto> getVendorEarnings(String username) {
-
-        Vendor vendor = vendorRepository.findByUserUsername(username)
-                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
-
-        LocalDate month = LocalDate.now().minusMonths(1);
-        LocalDate year = LocalDate.now().minusYears(1);
-
-        BigDecimal monthly =
-                bookingRepository.getTotalEarnings(vendor.getId(), month);
-
-        BigDecimal yearly =
-                bookingRepository.getTotalEarnings(vendor.getId(), year);
-
-        return ApiResponse.success(
-                "Vendor earnings fetched",
-                new EarningsDto(monthly, yearly)
-        );
-    }
-
-    public record EarningsDto(BigDecimal monthly, BigDecimal yearly) {}
+        public record EarningsDto(BigDecimal monthly, BigDecimal yearly) {
+        }
 }
