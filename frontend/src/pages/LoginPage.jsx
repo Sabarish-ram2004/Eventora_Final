@@ -26,7 +26,7 @@ export default function LoginPage() {
       const data = await login(form.emailOrUsername, form.password)
       if (data.user.role === 'VENDOR') navigate('/vendor/dashboard')
       else if (data.user.role === 'ADMIN') navigate('/admin')
-      else navigate('/dashboard')
+      else navigate('/home')
     } catch (err) {
       toast.error(err?.message || 'Login failed. Please check your credentials.')
     } finally { setLoading(false) }

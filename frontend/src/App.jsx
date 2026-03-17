@@ -28,7 +28,7 @@ function AppRoutes() {
       <div className="min-h-screen bg-brand-navy">
         <Navbar />
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/vendors" element={<VendorListPage />} />
