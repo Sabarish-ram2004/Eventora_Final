@@ -31,6 +31,8 @@ public class OtpService {
 
     public void sendOtp(String email, String type) {
 
+        email = email.trim().toLowerCase();
+
         String otp = generateOtp();
         String key = OTP_PREFIX + type + ":" + email;
 
@@ -44,17 +46,20 @@ public class OtpService {
 
     public void verifyOtp(String email, String otp, String type) {
 
+        email = email.trim().toLowerCase();
+
         String key = OTP_PREFIX + type + ":" + email;
 
-        String storedOtp = (String) redisTemplate.opsForValue().get(key);
+        Object value = redisTemplate.opsForValue().get(key);
+        String storedOtp = value != null ? value.toString() : null;
 
         if (storedOtp == null)
             throw EventoraException.badRequest("OTP expired");
 
-        if (!storedOtp.equals(otp))
+        if (!otp.equals(storedOtp))
             throw EventoraException.badRequest("Invalid OTP");
 
-        if (type.equalsIgnoreCase("REGISTRATION")) {
+        if ("REGISTRATION".equalsIgnoreCase(type)) {
 
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> EventoraException.notFound("User not found"));
@@ -69,6 +74,7 @@ public class OtpService {
     }
 
     private String generateOtp() {
+
         SecureRandom random = new SecureRandom();
         StringBuilder otp = new StringBuilder();
 
@@ -77,4 +83,5 @@ public class OtpService {
 
         return otp.toString();
     }
+
 }
