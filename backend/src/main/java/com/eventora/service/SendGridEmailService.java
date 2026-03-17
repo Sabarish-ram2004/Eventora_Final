@@ -4,11 +4,9 @@ import com.sendgrid.Method;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
-
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
-
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,19 +18,21 @@ public class SendGridEmailService {
     @Value("${sendgrid.api.key}")
     private String apiKey;
 
+    @Value("${app.mail.from}")
+    private String fromEmail;
+
     public void sendOtpMail(String toEmail, String otp, String type) {
 
         try {
 
-            Email from = new Email("syncoraevents@gmail.com");
+            Email from = new Email(fromEmail);
             String subject = getSubject(type);
 
             Email to = new Email(toEmail);
 
             Content content = new Content(
                     "text/html",
-                    buildOtpHtml(otp)
-            );
+                    buildOtpHtml(otp));
 
             Mail mail = new Mail(from, subject, to, content);
 
@@ -49,6 +49,7 @@ public class SendGridEmailService {
 
         } catch (Exception e) {
             log.error("SendGrid mail error {}", e.getMessage());
+            throw new RuntimeException("Failed to send email");
         }
     }
 
