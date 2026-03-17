@@ -1,5 +1,8 @@
 package com.eventora.service;
 
+import com.eventora.dto.common.ApiResponse;
+import com.eventora.dto.auth.AuthResponse;
+import com.eventora.dto.auth.RegisterRequest;
 import com.eventora.exception.EventoraException;
 import com.eventora.model.User;
 import com.eventora.repository.UserRepository;
@@ -12,105 +15,142 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final OtpService otpService;
 
+    // ⭐ REGISTER
     @Transactional
-    public Map<String, Object> register(String username, String email, String password, String role,
-                                         String firstName, String lastName, String phone) {
-        if (userRepository.existsByEmail(email)) throw EventoraException.conflict("Email already registered");
-        if (userRepository.existsByUsername(username)) throw EventoraException.conflict("Username already taken");
+    public ApiResponse<String> register(RegisterRequest request) {
+
+        if (userRepository.existsByEmail(request.getEmail()))
+            throw EventoraException.conflict("Email already registered");
+
+        if (userRepository.existsByUsername(request.getUsername()))
+            throw EventoraException.conflict("Username already taken");
+
+        // ⭐ split full name safely
+        String[] nameParts = request.getFullName() != null
+                ? request.getFullName().split(" ", 2)
+                : new String[]{"", ""};
 
         User user = User.builder()
-                .username(username)
-                .email(email)
-                .passwordHash(passwordEncoder.encode(password))
-                .role(User.UserRole.valueOf(role.toUpperCase()))
-                .firstName(firstName)
-                .lastName(lastName)
-                .phone(phone)
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .role(User.UserRole.valueOf(request.getRole().toUpperCase()))
+                .firstName(nameParts[0])
+                .lastName(nameParts.length > 1 ? nameParts[1] : "")
+                .phone(request.getPhone())
                 .isEmailVerified(false)
                 .isActive(true)
                 .build();
 
         userRepository.save(user);
-        otpService.sendOtp(email, "REGISTRATION");
-        return Map.of("message", "Registration successful. OTP sent to " + email, "email", email);
+
+        otpService.sendOtp(user.getEmail(), "REGISTRATION");
+
+        return ApiResponse.success(
+                "Registration successful. OTP sent to " + user.getEmail()
+        );
     }
 
+    // ⭐ VERIFY EMAIL
     @Transactional
-    public Map<String, String> verifyEmail(String email, String otp) {
+    public ApiResponse<String> verifyEmail(String email, String otp) {
+
         otpService.verifyOtp(email, otp, "REGISTRATION");
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> EventoraException.notFound("User not found"));
+
         user.setIsEmailVerified(true);
         userRepository.save(user);
-        return Map.of("message", "Email verified successfully. You can now login.");
+
+        return ApiResponse.success("Email verified successfully. You can now login.");
     }
 
-    public Map<String, Object> login(String emailOrUsername, String password) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(emailOrUsername, password));
+    // ⭐ LOGIN
+    public ApiResponse<AuthResponse> login(String emailOrUsername, String password) {
 
-        User user = userRepository.findByEmailOrUsername(emailOrUsername, emailOrUsername)
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(emailOrUsername, password)
+        );
+
+        User user = userRepository
+                .findByEmailOrUsername(emailOrUsername, emailOrUsername)
                 .orElseThrow(() -> EventoraException.notFound("User not found"));
 
-        if (!user.getIsEmailVerified()) {
-            throw EventoraException.forbidden("Please verify your email before logging in");
-        }
-        if (!user.getIsActive()) {
-            throw EventoraException.forbidden("Account suspended. Contact support.");
-        }
+        if (!user.getIsActive())
+            throw EventoraException.forbidden("Account suspended");
+
+        if (!user.getIsEmailVerified())
+            throw EventoraException.forbidden("Please verify your email first");
+
+        var authorities = List.of(
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+        );
 
         var userDetails = new org.springframework.security.core.userdetails.User(
-                user.getEmail(), user.getPasswordHash(),
-                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+                user.getUsername(),
+                user.getPasswordHash(),
+                authorities
+        );
 
-        String token = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateToken(userDetails);
         String refreshToken = jwtService.generateRefreshToken(userDetails);
 
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        return Map.of(
-                "token", token,
-                "refreshToken", refreshToken,
-                "user", Map.of(
-                        "id", user.getId(),
-                        "username", user.getUsername(),
-                        "email", user.getEmail(),
-                        "role", user.getRole(),
-                        "firstName", user.getFirstName() != null ? user.getFirstName() : "",
-                        "lastName", user.getLastName() != null ? user.getLastName() : ""
-                )
-        );
+        AuthResponse response = AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .userId(user.getId() != null ? user.getId().getMostSignificantBits() : null)
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .fullName(user.getFullName())
+                .emailVerified(user.getIsEmailVerified())
+                .build();
+
+        return ApiResponse.success("Login successful", response);
     }
 
-    public Map<String, String> forgotPassword(String email) {
+    // ⭐ FORGOT PASSWORD
+    public ApiResponse<String> forgotPassword(String email) {
+
         userRepository.findByEmail(email)
                 .orElseThrow(() -> EventoraException.notFound("No account found with this email"));
+
         otpService.sendOtp(email, "RESET");
-        return Map.of("message", "Password reset OTP sent to " + email);
+
+        return ApiResponse.success("Password reset OTP sent to " + email);
     }
 
+    // ⭐ RESET PASSWORD
     @Transactional
-    public Map<String, String> resetPassword(String email, String otp, String newPassword) {
+    public ApiResponse<String> resetPassword(String email, String otp, String newPassword) {
+
         otpService.verifyOtp(email, otp, "RESET");
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> EventoraException.notFound("User not found"));
+
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        return Map.of("message", "Password reset successfully");
+
+        return ApiResponse.success("Password reset successful");
     }
 }

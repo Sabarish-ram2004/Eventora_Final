@@ -1,49 +1,67 @@
 package com.eventora.controller;
 
+import com.eventora.dto.auth.*;
+import com.eventora.dto.common.ApiResponse;
 import com.eventora.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Map<String, Object> body) {
-        var result = authService.register(
-                (String) body.get("username"),
-                (String) body.get("email"),
-                (String) body.get("password"),
-                (String) body.getOrDefault("role", "USER"),
-                (String) body.get("firstName"),
-                (String) body.get("lastName"),
-                (String) body.get("phone")
-        );
-        return ResponseEntity.ok(result);
+    public ResponseEntity<ApiResponse<?>> register(
+            @Valid @RequestBody RegisterRequest request) {
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(authService.register(request));
     }
 
     @PostMapping("/verify-email")
-    public ResponseEntity<?> verifyEmail(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(authService.verifyEmail(body.get("email"), body.get("otp")));
+    public ResponseEntity<ApiResponse<?>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request) {
+
+        return ResponseEntity.ok(
+                authService.verifyEmail(request.getEmail(), request.getOtp())
+        );
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(authService.login(body.get("emailOrUsername"), body.get("password")));
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request) {
+
+        return ResponseEntity.ok(
+                authService.login(request.getEmailOrUsername(), request.getPassword())
+        );
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(authService.forgotPassword(body.get("email")));
+    public ResponseEntity<ApiResponse<?>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        return ResponseEntity.ok(
+                authService.forgotPassword(request.getEmail())
+        );
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(authService.resetPassword(
-                body.get("email"), body.get("otp"), body.get("newPassword")));
+    public ResponseEntity<ApiResponse<?>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        return ResponseEntity.ok(
+                authService.resetPassword(
+                        request.getEmail(),
+                        request.getOtp(),
+                        request.getNewPassword()
+                )
+        );
     }
 }

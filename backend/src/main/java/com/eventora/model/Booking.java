@@ -2,6 +2,8 @@ package com.eventora.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.UuidGenerator;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -9,107 +11,150 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "bookings")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(
+        name = "bookings",
+        indexes = {
+                @Index(name = "idx_booking_user", columnList = "user_id"),
+                @Index(name = "idx_booking_vendor", columnList = "vendor_id"),
+                @Index(name = "idx_booking_category", columnList = "category_id"),
+                @Index(name = "idx_booking_event_date", columnList = "event_date"),
+                @Index(name = "idx_booking_status", columnList = "status")
+        }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Booking {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue
+    @UuidGenerator
+    @Column(updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "booking_reference", unique = true)
+    @Column(name = "booking_reference", nullable = false, unique = true, length = 30)
     private String bookingReference;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vendor_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vendor_id")
     private Vendor vendor;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_id")
     private VendorService service;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Vendor.ServiceCategory category;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory category;
 
     @Column(name = "event_date", nullable = false)
     private LocalDate eventDate;
 
-    @Column(name = "event_time")
     private LocalTime eventTime;
 
     @Enumerated(EnumType.STRING)
     private OccasionType occasion;
 
-    @Column(name = "guest_count")
     private Integer guestCount;
 
-    @Column(name = "venue_address", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String venueAddress;
 
-    @Column(name = "special_requirements", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String specialRequirements;
 
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private BookingStatus status = BookingStatus.PENDING;
 
-    @Column(name = "quoted_price", precision = 12, scale = 2)
-    private BigDecimal quotedPrice;
-
-    @Column(name = "final_price", precision = 12, scale = 2)
-    private BigDecimal finalPrice;
-
-    @Column(name = "advance_paid", precision = 12, scale = 2)
+    @Column(nullable = false, precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal advancePaid = BigDecimal.ZERO;
 
-    @Column(name = "payment_status")
-    @Builder.Default
-    private String paymentStatus = "UNPAID";
+    @Column(precision = 12, scale = 2)
+    private BigDecimal quotedPrice;
 
-    @Column(name = "vendor_notes", columnDefinition = "TEXT")
+    @Column(precision = 12, scale = 2)
+    private BigDecimal finalPrice;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    @Column(columnDefinition = "TEXT")
     private String vendorNotes;
 
-    @Column(name = "user_notes", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String userNotes;
 
-    @Column(name = "is_flagged")
+    @Column(nullable = false)
     @Builder.Default
-    private Boolean isFlagged = false;
+    private boolean flagged = false;
 
-    @Column(name = "flag_reason")
     private String flagReason;
 
-    @Column(name = "created_at")
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
-
-    @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
-
-    @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Version
+    private Long version;
+
     @PrePersist
-    protected void onCreate() {
+    void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+
+        if (bookingReference == null) {
+            bookingReference = "EVT-" +
+                    UUID.randomUUID().toString()
+                            .substring(0, 8)
+                            .toUpperCase();
+        }
     }
 
     @PreUpdate
-    protected void onUpdate() {
+    void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
 
-    public enum BookingStatus { PENDING, CONFIRMED, REJECTED, WAITLISTED, CANCELLED, COMPLETED }
-    public enum OccasionType { WEDDING, BIRTHDAY, CORPORATE, ANNIVERSARY, BABY_SHOWER, GRADUATION, FESTIVAL, OTHER }
+    public enum BookingStatus {
+        PENDING,
+        CONFIRMED,
+        REJECTED,
+        WAITLISTED,
+        CANCELLED,
+        COMPLETED
+    }
+
+    public enum PaymentStatus {
+        UNPAID,
+        ADVANCE_PAID,
+        PARTIALLY_PAID,
+        PAID,
+        REFUNDED
+    }
+
+    public enum OccasionType {
+        WEDDING,
+        BIRTHDAY,
+        CORPORATE,
+        ANNIVERSARY,
+        BABY_SHOWER,
+        GRADUATION,
+        FESTIVAL,
+        OTHER
+    }
 }

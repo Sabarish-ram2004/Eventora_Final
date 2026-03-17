@@ -17,15 +17,16 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api")
 public class VendorController {
 
     private final VendorService vendorService;
     private final UserRepository userRepository;
 
-    // ⭐ PUBLIC SEARCH VENDORS
+    // ⭐ PUBLIC SEARCH
     @GetMapping("/public/vendors")
     public ResponseEntity<?> getVendors(
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
@@ -33,15 +34,12 @@ public class VendorController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
 
-        Vendor.ServiceCategory cat =
-                category != null ? Vendor.ServiceCategory.valueOf(category.toUpperCase()) : null;
-
         return ResponseEntity.ok(
-                vendorService.getVendors(cat, city, minPrice, maxPrice, minRating, page, size)
+                vendorService.getVendors(categorySlug, city, minPrice, maxPrice, minRating, page, size)
         );
     }
 
-    // ⭐ GET SINGLE VENDOR
+    // ⭐ GET SINGLE
     @GetMapping("/public/vendors/{id}")
     public ResponseEntity<?> getVendor(@PathVariable UUID id) {
         return ResponseEntity.ok(vendorService.getVendorById(id));
@@ -127,7 +125,7 @@ public class VendorController {
         );
     }
 
-    // ⭐ COMMON METHOD
+    // ⭐ COMMON
     private UUID getUserId(UserDetails userDetails) {
 
         User user = userRepository.findByEmail(userDetails.getUsername())

@@ -6,53 +6,78 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
 public class AppConfig {
+
     private final UserRepository userRepository;
 
+    /**
+     * Custom UserDetailsService
+     * Allows login using username OR email
+     */
     @Bean
     public UserDetailsService userDetailsService() {
-        return usernameOrEmail -> {
+        return login -> {
 
             var user = userRepository
-                    .findByEmailOrUsername(usernameOrEmail, usernameOrEmail)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found: " + usernameOrEmail));
+                    .findByEmailOrUsername(login, login)
+                    .orElseThrow(() ->
+                            new UsernameNotFoundException("User not found"));
 
-            // ⭐⭐⭐ VERY IMPORTANT CHECK ⭐⭐⭐
+            // block login if email not verified
             if (Boolean.FALSE.equals(user.getIsEmailVerified())) {
-                throw new UsernameNotFoundException("Please verify your email before login");
+                throw new DisabledException("Please verify your email before login");
             }
 
-            return new org.springframework.security.core.userdetails.User(
-                    user.getEmail(),
+            return new User(
+                    user.getUsername(), // principal identity
                     user.getPasswordHash(),
-                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+                    List.of(
+                            new SimpleGrantedAuthority(
+                                    "ROLE_" + user.getRole().name()
+                            )
+                    )
+            );
         };
     }
 
+    /**
+     * Authentication Provider
+     */
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService());
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService());
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
     }
 
+    /**
+     * Authentication Manager
+     */
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Password Encoder (BCrypt)
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

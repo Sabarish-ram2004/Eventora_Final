@@ -1,15 +1,15 @@
 package com.eventora.service;
 
 import com.eventora.exception.EventoraException;
+import com.eventora.model.ServiceCategory;
 import com.eventora.model.User;
 import com.eventora.model.Vendor;
+import com.eventora.repository.ServiceCategoryRepository;
 import com.eventora.repository.UserRepository;
 import com.eventora.repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +24,7 @@ public class VendorService {
 
     private final VendorRepository vendorRepository;
     private final UserRepository userRepository;
+    private final ServiceCategoryRepository categoryRepository;
 
     @Transactional
     @SuppressWarnings("unchecked")
@@ -36,28 +37,34 @@ public class VendorService {
             throw EventoraException.conflict("Vendor profile already exists");
         }
 
+        String categorySlug = (String) data.get("categorySlug");
+
+        ServiceCategory category = categoryRepository.findBySlug(categorySlug)
+                .orElseThrow(() -> EventoraException.notFound("Invalid category"));
+
         Vendor vendor = Vendor.builder()
                 .user(user)
                 .businessName((String) data.get("businessName"))
                 .tagline((String) data.get("tagline"))
                 .description((String) data.get("description"))
-                .category(Vendor.ServiceCategory.valueOf((String) data.get("category")))
+                .category(category)
                 .phone((String) data.get("phone"))
                 .email((String) data.get("email"))
                 .address((String) data.get("address"))
                 .city((String) data.get("city"))
                 .pincode((String) data.get("pincode"))
                 .googleMapsLink((String) data.get("googleMapsLink"))
-                .startingPrice(data.get("startingPrice") != null ?
-                        new BigDecimal(data.get("startingPrice").toString()) : null)
+                .startingPrice(data.get("startingPrice") != null
+                        ? new BigDecimal(data.get("startingPrice").toString())
+                        : null)
                 .amenities((List<String>) data.getOrDefault("amenities", new ArrayList<>()))
                 .serviceSubtypes((List<String>) data.getOrDefault("serviceSubtypes", new ArrayList<>()))
                 .status(Vendor.VendorStatus.PENDING_APPROVAL)
                 .build();
 
-        vendor = vendorRepository.save(vendor);
         updateProfileCompletion(vendor);
-        return vendor;
+
+        return vendorRepository.save(vendor);
     }
 
     @Transactional
@@ -71,6 +78,7 @@ public class VendorService {
         if (data.containsKey("tagline")) vendor.setTagline((String) data.get("tagline"));
         if (data.containsKey("description")) vendor.setDescription((String) data.get("description"));
         if (data.containsKey("phone")) vendor.setPhone((String) data.get("phone"));
+        if (data.containsKey("email")) vendor.setEmail((String) data.get("email"));
         if (data.containsKey("address")) vendor.setAddress((String) data.get("address"));
         if (data.containsKey("city")) vendor.setCity((String) data.get("city"));
         if (data.containsKey("pincode")) vendor.setPincode((String) data.get("pincode"));
@@ -83,21 +91,28 @@ public class VendorService {
         if (data.containsKey("amenities")) vendor.setAmenities((List<String>) data.get("amenities"));
         if (data.containsKey("serviceSubtypes")) vendor.setServiceSubtypes((List<String>) data.get("serviceSubtypes"));
 
-        vendor = vendorRepository.save(vendor);
         updateProfileCompletion(vendor);
-        return vendor;
+
+        return vendorRepository.save(vendor);
     }
 
-    // ⭐ FIXED METHOD
-    public Page<Vendor> getVendors(Vendor.ServiceCategory category,
-                                  String city,
-                                  BigDecimal minPrice,
-                                  BigDecimal maxPrice,
-                                  BigDecimal minRating,
-                                  int page,
-                                  int size) {
+    public Page<Vendor> getVendors(
+            String categorySlug,
+            String city,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            BigDecimal minRating,
+            int page,
+            int size) {
 
         Pageable pageable = PageRequest.of(page, size);
+
+        ServiceCategory category = null;
+
+        if (categorySlug != null && !categorySlug.isBlank()) {
+            category = categoryRepository.findBySlug(categorySlug)
+                    .orElseThrow(() -> EventoraException.notFound("Category not found"));
+        }
 
         return vendorRepository.findVendorsWithFilters(
                 category,
@@ -105,7 +120,7 @@ public class VendorService {
                 minPrice,
                 maxPrice,
                 minRating,
-                Vendor.VendorStatus.ACTIVE,   // ⭐ VERY IMPORTANT FIX
+                Vendor.VendorStatus.ACTIVE,
                 pageable
         );
     }
@@ -114,7 +129,7 @@ public class VendorService {
 
         Pageable pageable = PageRequest.of(0, limit);
 
-        if (city != null && !city.isEmpty()) {
+        if (city != null && !city.isBlank()) {
             return vendorRepository.findTopVendorsByCity(city, pageable);
         }
 
@@ -150,31 +165,13 @@ public class VendorService {
         return vendorRepository.save(vendor);
     }
 
-    @Transactional
-    public Vendor updateLogo(UUID vendorId, String logoUrl) {
-
-        Vendor vendor = getVendorById(vendorId);
-        vendor.setLogoUrl(logoUrl);
-
-        return vendorRepository.save(vendor);
-    }
-
-    @Transactional
-    public Vendor updateCoverBanner(UUID vendorId, String bannerUrl) {
-
-        Vendor vendor = getVendorById(vendorId);
-        vendor.setCoverBannerUrl(bannerUrl);
-
-        return vendorRepository.save(vendor);
-    }
-
     private void updateProfileCompletion(Vendor vendor) {
 
         int score = 0;
 
-        if (vendor.getBusinessName() != null && !vendor.getBusinessName().isEmpty()) score += 10;
-        if (vendor.getDescription() != null && !vendor.getDescription().isEmpty()) score += 15;
-        if (vendor.getTagline() != null && !vendor.getTagline().isEmpty()) score += 5;
+        if (vendor.getBusinessName() != null) score += 10;
+        if (vendor.getDescription() != null) score += 15;
+        if (vendor.getTagline() != null) score += 5;
         if (vendor.getLogoUrl() != null) score += 15;
         if (vendor.getCoverBannerUrl() != null) score += 10;
         if (vendor.getPhone() != null) score += 10;
@@ -186,7 +183,6 @@ public class VendorService {
         if (vendor.getServiceSubtypes() != null && !vendor.getServiceSubtypes().isEmpty()) score += 5;
 
         vendor.setProfileCompletionScore(score);
-        vendorRepository.save(vendor);
     }
 
     @Scheduled(fixedRate = 3600000)

@@ -1,9 +1,6 @@
 package com.eventora.dto.auth;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.*;
 
 @Getter
@@ -11,7 +8,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class OtpVerifyRequest {
+public class ResetPasswordRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
@@ -21,4 +18,8 @@ public class OtpVerifyRequest {
     @NotBlank(message = "OTP is required")
     @Pattern(regexp = "^[0-9]{4,8}$", message = "OTP must be numeric and 4–8 digits")
     private String otp;
+
+    @NotBlank(message = "New password is required")
+    @Size(min = 8, max = 120, message = "Password must be 8–120 characters")
+    private String newPassword;
 }

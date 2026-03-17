@@ -3,20 +3,34 @@ package com.eventora.dto.auth;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class RegisterRequest {
-    @NotBlank @Size(min = 3, max = 50)
+
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 50, message = "Username must be 3–50 characters")
+    @Pattern(regexp = "^[a-zA-Z0-9_.-]+$", message = "Username contains invalid characters")
     private String username;
 
-    @NotBlank @Email
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    @Size(max = 120, message = "Email is too long")
     private String email;
 
-    @NotBlank @Size(min = 8)
+    @NotBlank(message = "Password is required")
+    @Size(min = 8, max = 120, message = "Password must be at least 8 characters")
     private String password;
 
+    @Size(max = 120, message = "Full name is too long")
     private String fullName;
+
+    @Pattern(regexp = "^[0-9]{7,15}$", message = "Phone must be numeric (7–15 digits)")
     private String phone;
 
-    @NotNull
-    private String role; // USER or VENDOR
+    @NotBlank(message = "Role is required")
+    @Pattern(regexp = "USER|VENDOR|ADMIN", message = "Role must be USER or VENDOR or ADMIN")
+    private String role;
 }

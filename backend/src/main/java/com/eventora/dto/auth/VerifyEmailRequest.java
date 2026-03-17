@@ -11,7 +11,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class OtpVerifyRequest {
+public class VerifyEmailRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")

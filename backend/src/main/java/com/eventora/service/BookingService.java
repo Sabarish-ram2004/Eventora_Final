@@ -1,129 +1,206 @@
 package com.eventora.service;
 
+import com.eventora.dto.booking.CreateBookingRequest;
+import com.eventora.dto.booking.UpdateBookingStatusRequest;
+import com.eventora.dto.common.ApiResponse;
 import com.eventora.exception.EventoraException;
-import com.eventora.model.*;
-import com.eventora.repository.*;
+import com.eventora.model.Booking;
+import com.eventora.model.ServiceCategory;
+import com.eventora.model.User;
+import com.eventora.model.Vendor;
+import com.eventora.repository.BookingRepository;
+//import com.eventora.repository.ServiceCategoryRepository;
+import com.eventora.repository.UserRepository;
+import com.eventora.repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class BookingService {
+
     private final BookingRepository bookingRepository;
     private final VendorRepository vendorRepository;
     private final UserRepository userRepository;
+    //private final ServiceCategoryRepository categoryRepository;
 
+    // ⭐ CREATE BOOKING
     @Transactional
-    public Booking createBooking(UUID userId, Map<String, Object> data) {
-        UUID vendorId = UUID.fromString((String) data.get("vendorId"));
-        LocalDate eventDate = LocalDate.parse((String) data.get("eventDate"));
-        Vendor.ServiceCategory category = Vendor.ServiceCategory.valueOf((String) data.get("category"));
+    public ApiResponse<String> createBooking(String username, CreateBookingRequest request) {
 
-        // Check duplicate booking rule
-        if (bookingRepository.userHasBookingOnDate(userId, category, eventDate)) {
-            throw EventoraException.conflict(
-                    "You already have a " + category.name() + " booking on " + eventDate +
-                    ". You cannot book the same service category twice on the same date.");
-        }
-
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> EventoraException.notFound("User not found"));
-        Vendor vendor = vendorRepository.findById(vendorId)
+
+        Vendor vendor = vendorRepository.findById(request.getVendorId())
                 .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
 
         if (vendor.getStatus() != Vendor.VendorStatus.ACTIVE) {
-            throw EventoraException.badRequest("Vendor is not available for bookings");
+            throw EventoraException.badRequest("Vendor is not accepting bookings");
         }
 
-        // Check vendor availability
-        List<Booking> existingBookings = bookingRepository.findByVendorIdAndEventDateAndStatusNotIn(
-                vendorId, eventDate, List.of(Booking.BookingStatus.CANCELLED, Booking.BookingStatus.REJECTED));
+        ServiceCategory category = vendor.getCategory();
+
+        // ⭐ duplicate booking rule
+        if (bookingRepository.userHasBookingOnDate(
+                user.getId(),
+                category,
+                request.getEventDate())) {
+
+            throw EventoraException.conflict(
+                    "You already have a booking in this category on selected date");
+        }
+
+        // ⭐ vendor slot check
+        boolean vendorBusy =
+                bookingRepository.vendorHasBookingOnDate(
+                        vendor.getId(),
+                        request.getEventDate()
+                );
+
+        Booking.BookingStatus status =
+                vendorBusy
+                        ? Booking.BookingStatus.WAITLISTED
+                        : Booking.BookingStatus.PENDING;
 
         Booking booking = Booking.builder()
                 .user(user)
                 .vendor(vendor)
                 .category(category)
-                .eventDate(eventDate)
-                .occasion(data.get("occasion") != null ?
-                        Booking.OccasionType.valueOf((String) data.get("occasion")) : null)
-                .guestCount(data.get("guestCount") != null ?
-                        Integer.parseInt(data.get("guestCount").toString()) : null)
-                .venueAddress((String) data.get("venueAddress"))
-                .specialRequirements((String) data.get("specialRequirements"))
-                .quotedPrice(data.get("quotedPrice") != null ?
-                        new BigDecimal(data.get("quotedPrice").toString()) : null)
-                .status(existingBookings.size() >= 1 ?
-                        Booking.BookingStatus.WAITLISTED : Booking.BookingStatus.PENDING)
+                .eventDate(request.getEventDate())
+                .venueAddress(request.getVenueAddress())
+                .specialRequirements(request.getNotes())
+                .status(status)
                 .build();
 
-        booking = bookingRepository.save(booking);
+        bookingRepository.save(booking);
 
-        // Update vendor booking count
-        vendor.setTotalBookings(vendor.getTotalBookings() + 1);
+        // ⭐ null safe increment
+        vendor.setTotalBookings(
+                vendor.getTotalBookings() == null
+                        ? 1
+                        : vendor.getTotalBookings() + 1
+        );
+
         vendorRepository.save(vendor);
 
-        return booking;
+        return ApiResponse.success(
+                "Booking created successfully",
+                booking.getBookingReference()
+        );
     }
 
+    // ⭐ UPDATE BOOKING STATUS
     @Transactional
-    public Booking updateBookingStatus(UUID bookingId, UUID vendorId, String status, String notes) {
+    public ApiResponse<String> updateBookingStatus(
+            UUID bookingId,
+            String username,
+            UpdateBookingStatusRequest request) {
+
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> EventoraException.notFound("Booking not found"));
 
-        if (!booking.getVendor().getId().equals(vendorId)) {
-            throw EventoraException.forbidden("Not authorized to manage this booking");
+        if (!booking.getVendor().getUser().getUsername().equals(username)) {
+            throw EventoraException.forbidden("Not allowed");
         }
 
-        Booking.BookingStatus newStatus = Booking.BookingStatus.valueOf(status.toUpperCase());
+        Booking.BookingStatus newStatus =
+                Booking.BookingStatus.valueOf(request.getStatus());
+
+        Booking.BookingStatus current = booking.getStatus();
+
+        // ⭐ state machine validation
+        if (current == Booking.BookingStatus.COMPLETED ||
+                current == Booking.BookingStatus.CANCELLED ||
+                current == Booking.BookingStatus.REJECTED) {
+            throw EventoraException.badRequest("Booking already finalized");
+        }
+
         booking.setStatus(newStatus);
-        booking.setVendorNotes(notes);
+        booking.setVendorNotes(request.getNotes());
 
         if (newStatus == Booking.BookingStatus.CONFIRMED) {
             booking.setConfirmedAt(LocalDateTime.now());
-            Vendor vendor = booking.getVendor();
-            vendor.setSuccessfulBookings(vendor.getSuccessfulBookings() + 1);
-            vendorRepository.save(vendor);
-        } else if (newStatus == Booking.BookingStatus.CANCELLED) {
+        }
+        if (newStatus == Booking.BookingStatus.CANCELLED) {
             booking.setCancelledAt(LocalDateTime.now());
-        } else if (newStatus == Booking.BookingStatus.COMPLETED) {
+        }
+        if (newStatus == Booking.BookingStatus.COMPLETED) {
             booking.setCompletedAt(LocalDateTime.now());
         }
 
-        return bookingRepository.save(booking);
+        bookingRepository.save(booking);
+
+        return ApiResponse.success("Booking status updated");
     }
 
-    public Page<Booking> getUserBookings(UUID userId, int page, int size) {
-        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size));
+    // ⭐ USER BOOKINGS
+    public ApiResponse<Page<Booking>> getUserBookings(String username, int page, int size) {
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> EventoraException.notFound("User not found"));
+
+        Page<Booking> bookings =
+                bookingRepository.findByUser_IdOrderByCreatedAtDesc(
+                        user.getId(),
+                        PageRequest.of(page, size)
+                );
+
+        return ApiResponse.success(bookings);
     }
 
-    public Page<Booking> getVendorBookings(UUID vendorId, int page, int size) {
-        return bookingRepository.findByVendorIdOrderByCreatedAtDesc(vendorId, PageRequest.of(page, size));
+    // ⭐ VENDOR BOOKINGS
+    public ApiResponse<Page<Booking>> getVendorBookings(String username, int page, int size) {
+
+        Vendor vendor = vendorRepository.findByUserUsername(username)
+                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
+
+        Page<Booking> bookings =
+                bookingRepository.findByVendor_IdOrderByCreatedAtDesc(
+                        vendor.getId(),
+                        PageRequest.of(page, size)
+                );
+
+        return ApiResponse.success(bookings);
     }
 
-    public Booking getBookingByReference(String reference) {
-        return bookingRepository.findByBookingReference(reference)
+    // ⭐ GET BOOKING BY REF
+    public ApiResponse<Booking> getBookingByReference(String reference) {
+
+        Booking booking = bookingRepository.findByBookingReference(reference)
                 .orElseThrow(() -> EventoraException.notFound("Booking not found"));
+
+        return ApiResponse.success(booking);
     }
 
-    public Map<String, Object> getVendorEarnings(UUID vendorId) {
-        LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
-        LocalDate oneYearAgo = LocalDate.now().minusYears(1);
-        BigDecimal monthlyEarnings = bookingRepository.getTotalEarnings(vendorId, oneMonthAgo);
-        BigDecimal yearlyEarnings = bookingRepository.getTotalEarnings(vendorId, oneYearAgo);
-        return Map.of(
-                "monthlyEarnings", monthlyEarnings != null ? monthlyEarnings : BigDecimal.ZERO,
-                "yearlyEarnings", yearlyEarnings != null ? yearlyEarnings : BigDecimal.ZERO
+    // ⭐ VENDOR EARNINGS
+    public ApiResponse<EarningsDto> getVendorEarnings(String username) {
+
+        Vendor vendor = vendorRepository.findByUserUsername(username)
+                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
+
+        LocalDate month = LocalDate.now().minusMonths(1);
+        LocalDate year = LocalDate.now().minusYears(1);
+
+        BigDecimal monthly =
+                bookingRepository.getTotalEarnings(vendor.getId(), month);
+
+        BigDecimal yearly =
+                bookingRepository.getTotalEarnings(vendor.getId(), year);
+
+        return ApiResponse.success(
+                "Vendor earnings fetched",
+                new EarningsDto(monthly, yearly)
         );
     }
+
+    public record EarningsDto(BigDecimal monthly, BigDecimal yearly) {}
 }

@@ -2,6 +2,7 @@ package com.eventora.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -11,12 +12,12 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", updatable = false, nullable = false)
+    @Column(updatable = false, nullable = false)
     private UUID id;
 
     @Column(unique = true, nullable = false, length = 50)
@@ -57,12 +58,10 @@ public class User {
     @Column(name = "google_maps_link")
     private String googleMapsLink;
 
-    // ⭐ EMAIL VERIFICATION STATUS
     @Column(name = "is_email_verified")
     @Builder.Default
     private Boolean isEmailVerified = false;
 
-    // ⭐ EMAIL VERIFICATION TOKEN
     @Column(name = "verification_token", length = 255)
     private String verificationToken;
 
@@ -79,6 +78,7 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // ⭐ Auto timestamps
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -88,6 +88,13 @@ public class User {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    // ⭐ Computed full name (NOT part of builder)
+    public String getFullName() {
+        return (firstName != null ? firstName : "") +
+                " " +
+                (lastName != null ? lastName : "");
     }
 
     public enum UserRole {
