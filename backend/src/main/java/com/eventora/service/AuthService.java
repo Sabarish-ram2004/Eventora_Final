@@ -46,7 +46,7 @@ public class AuthService {
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(User.UserRole.valueOf(request.getRole()))   // role already validated in DTO
+                .role(User.UserRole.valueOf(request.getRole().toUpperCase()))   // role already validated in DTO
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .phone(request.getPhone())
