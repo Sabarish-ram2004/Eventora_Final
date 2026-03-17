@@ -1,5 +1,6 @@
 package com.eventora.dto.auth;
 
+import com.eventora.model.enums.Role;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -17,11 +18,14 @@ public class RegisterRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
-    @Size(max = 120, message = "Email is too long")
+    @Size(max = 120)
     private String email;
 
     @NotBlank(message = "Password is required")
-    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,120}$", message = "Password must contain uppercase, lowercase and number")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,120}$",
+            message = "Password must contain uppercase, lowercase and number"
+    )
     private String password;
 
     @NotBlank(message = "First name is required")
@@ -34,8 +38,6 @@ public class RegisterRequest {
     @Pattern(regexp = "^\\+?[0-9]{7,15}$", message = "Invalid phone number")
     private String phone;
 
-    @NotBlank(message = "Role is required")
-    @Pattern(regexp = "USER|VENDOR|ADMIN", message = "Role must be USER or VENDOR or ADMIN")
-    private String role;
-
+    @NotNull(message = "Role is required")
+    private Role role;
 }
