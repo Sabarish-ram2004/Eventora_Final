@@ -11,7 +11,7 @@ import lombok.*;
 public class RegisterRequest {
 
     @NotBlank(message = "Username is required")
-    @Size(min = 3, max = 50, message = "Username must be 3–50 characters")
+    @Size(min = 3, max = 30, message = "Username must be 3–30 characters")
     @Pattern(regexp = "^[a-zA-Z0-9_.-]+$", message = "Username contains invalid characters")
     private String username;
 
@@ -21,7 +21,7 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 8, max = 120, message = "Password must be at least 8 characters")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,120}$", message = "Password must contain uppercase, lowercase and number")
     private String password;
 
     @NotBlank(message = "First name is required")
@@ -31,10 +31,11 @@ public class RegisterRequest {
     @Size(max = 60)
     private String lastName;
 
-    @Pattern(regexp = "^[0-9]{7,15}$", message = "Phone must be numeric (7–15 digits)")
+    @Pattern(regexp = "^\\+?[0-9]{7,15}$", message = "Invalid phone number")
     private String phone;
 
     @NotBlank(message = "Role is required")
     @Pattern(regexp = "USER|VENDOR|ADMIN", message = "Role must be USER or VENDOR or ADMIN")
     private String role;
+
 }

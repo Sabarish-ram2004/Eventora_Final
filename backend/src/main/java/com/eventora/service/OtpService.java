@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 public class OtpService {
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final SendGridEmailService sendGridEmailService;
+    private final EmailService emailService;
     private final UserRepository userRepository;
 
     @Value("${OTP_LENGTH}")
@@ -35,10 +35,9 @@ public class OtpService {
         String key = OTP_PREFIX + type + ":" + email;
 
         redisTemplate.opsForValue()
-                .set(key, otp, 
-                    expiry, TimeUnit.MINUTES);
+                .set(key, otp, expiry, TimeUnit.MINUTES);
 
-        sendGridEmailService.sendOtpMail(email, otp, type);
+        emailService.sendOtpMail(email, otp, type);
 
         log.info("OTP sent {}", email);
     }
