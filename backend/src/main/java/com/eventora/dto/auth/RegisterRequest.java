@@ -35,6 +35,6 @@ public class RegisterRequest {
     private String phone;
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "USER|VENDOR|ADMIN", message = "Role must be USER or VENDOR or ADMIN")
+    @Pattern(regexp = "CUSTOMER|VENDOR|ADMIN", message = "Role must be CUSTOMER or VENDOR or ADMIN")
     private String role;
 }
