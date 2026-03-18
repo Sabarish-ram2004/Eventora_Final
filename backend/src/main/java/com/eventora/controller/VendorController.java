@@ -72,10 +72,10 @@ public class VendorController {
             @RequestBody Map<String, Object> data) {
 
         UUID userId = getUserId(userDetails);
-        Vendor vendor = vendorService.getVendorByUserId(userId);
+        Vendor vendor = vendorService.getVendorById(userId);
 
         return ResponseEntity.ok(
-                vendorService.updateVendorProfile(vendor.getId(), data)
+                vendorService.createVendorProfile(vendor.getId(), data)
         );
     }
 
@@ -86,7 +86,7 @@ public class VendorController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         UUID userId = getUserId(userDetails);
-        return ResponseEntity.ok(vendorService.getVendorByUserId(userId));
+        return ResponseEntity.ok(vendorService.getVendorById(userId));
     }
 
     // ⭐ VENDOR STATS
@@ -96,7 +96,7 @@ public class VendorController {
             @AuthenticationPrincipal UserDetails userDetails) {
 
         UUID userId = getUserId(userDetails);
-        Vendor vendor = vendorService.getVendorByUserId(userId);
+        Vendor vendor = vendorService.getVendorById(userId);
 
         return ResponseEntity.ok(vendorService.getVendorStats(vendor.getId()));
     }
