@@ -97,24 +97,30 @@ public class VendorService {
             int page,
             int size) {
 
-        Pageable pageable = PageRequest.of(page, size);
+    Pageable pageable = PageRequest.of(page, size);
 
-        ServiceCategory category = null;
+    // 🔥 TEMP DEBUG — remove custom JPQL filter
+    return vendorRepository.findAll(pageable);
 
-        if (categorySlug != null && !categorySlug.isBlank()) {
-            category = categoryRepository.findBySlug(categorySlug)
-                    .orElseThrow(() -> EventoraException.notFound("Category not found"));
-        }
 
-        return vendorRepository.findVendorsWithFilters(
-                category,
-                city,
-                minPrice,
-                maxPrice,
-                minRating,
-                VendorStatus.ACTIVE,
-                pageable
-        );
+        // Pageable pageable = PageRequest.of(page, size);
+
+        // ServiceCategory category = null;
+
+        // if (categorySlug != null && !categorySlug.isBlank()) {
+        //     category = categoryRepository.findBySlug(categorySlug)
+        //             .orElseThrow(() -> EventoraException.notFound("Category not found"));
+        // }
+
+        // return vendorRepository.findVendorsWithFilters(
+        //         category,
+        //         city,
+        //         minPrice,
+        //         maxPrice,
+        //         minRating,
+        //         VendorStatus.ACTIVE,
+        //         pageable
+        // );
     }
 
     public List<Vendor> getTopVendors(String city, int limit) {
