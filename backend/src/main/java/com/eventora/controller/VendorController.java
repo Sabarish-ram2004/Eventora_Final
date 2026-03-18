@@ -24,19 +24,22 @@ public class VendorController {
 
     // ⭐ PUBLIC SEARCH
     @GetMapping("/public/vendors")
-    public ResponseEntity<?> getVendors(
-            @RequestParam(required = false) String categorySlug,
-            @RequestParam(required = false) String city,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(required = false) BigDecimal minRating,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+public String test() {
+    return "API WORKING";
+}
+    // public ResponseEntity<?> getVendors(
+    //         @RequestParam(required = false) String categorySlug,
+    //         @RequestParam(required = false) String city,
+    //         @RequestParam(required = false) BigDecimal minPrice,
+    //         @RequestParam(required = false) BigDecimal maxPrice,
+    //         @RequestParam(required = false) BigDecimal minRating,
+    //         @RequestParam(defaultValue = "0") int page,
+    //         @RequestParam(defaultValue = "12") int size) {
 
-        return ResponseEntity.ok(
-                vendorService.getVendors(categorySlug, city, minPrice, maxPrice, minRating, page, size)
-        );
-    }
+    //     return ResponseEntity.ok(
+    //             vendorService.getVendors(categorySlug, city, minPrice, maxPrice, minRating, page, size)
+    //     );
+    // }
 
     // ⭐ GET SINGLE
     @GetMapping("/public/vendors/{id}")
