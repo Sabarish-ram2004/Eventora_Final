@@ -7,7 +7,6 @@ server:
 spring:
   application:
     name: eventora-backend
-
   datasource:
     url: ${DB_URL}
     username: ${DB_USER}
@@ -30,12 +29,11 @@ spring:
       hibernate:
         jdbc:
           batch_size: 20
-        order_inserts: true
-        order_updates: true
-        jdbc:
           lob:
             non_contextual_creation: true
-
+        order_inserts: true
+        order_updates: true
+          
   data:
     redis:
       host: ${REDIS_HOST}
