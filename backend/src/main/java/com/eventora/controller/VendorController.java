@@ -17,7 +17,6 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api")
 public class VendorController {
 
     private final VendorService vendorService;
