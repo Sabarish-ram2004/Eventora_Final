@@ -66,6 +66,8 @@ public interface VendorRepository extends JpaRepository<Vendor, UUID>, JpaSpecif
             Pageable pageable);
 
     // ⭐ AI SCORE UPDATE
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE Vendor v SET v.overallRankingScore = (
                 (COALESCE(v.avgRating, 0) * 0.25) +
@@ -84,5 +86,5 @@ public interface VendorRepository extends JpaRepository<Vendor, UUID>, JpaSpecif
             )
             WHERE v.status = :status
             """)
-    void updateAllRankingScores(@Param("status") VendorStatus status);
+    int updateAllRankingScores(@Param("status") VendorStatus status);
 }
