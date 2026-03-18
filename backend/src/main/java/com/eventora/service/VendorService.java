@@ -7,13 +7,14 @@ import com.eventora.model.Vendor;
 import com.eventora.repository.ServiceCategoryRepository;
 import com.eventora.repository.UserRepository;
 import com.eventora.repository.VendorRepository;
+import com.eventora.model.enums.VendorStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.eventora.model.enums.VendorStatus;
+
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -68,7 +69,6 @@ public class VendorService {
     }
 
     @Transactional
-    @SuppressWarnings("unchecked")
     public Vendor updateVendorProfile(UUID vendorId, Map<String, Object> data) {
 
         Vendor vendor = vendorRepository.findById(vendorId)
@@ -82,14 +82,6 @@ public class VendorService {
         if (data.containsKey("address")) vendor.setAddress((String) data.get("address"));
         if (data.containsKey("city")) vendor.setCity((String) data.get("city"));
         if (data.containsKey("pincode")) vendor.setPincode((String) data.get("pincode"));
-        if (data.containsKey("googleMapsLink")) vendor.setGoogleMapsLink((String) data.get("googleMapsLink"));
-
-        if (data.containsKey("startingPrice") && data.get("startingPrice") != null) {
-            vendor.setStartingPrice(new BigDecimal(data.get("startingPrice").toString()));
-        }
-
-        if (data.containsKey("amenities")) vendor.setAmenities((List<String>) data.get("amenities"));
-        if (data.containsKey("serviceSubtypes")) vendor.setServiceSubtypes((List<String>) data.get("serviceSubtypes"));
 
         updateProfileCompletion(vendor);
 
@@ -130,10 +122,17 @@ public class VendorService {
         Pageable pageable = PageRequest.of(0, limit);
 
         if (city != null && !city.isBlank()) {
-            return vendorRepository.findTopVendorsByCity(city, pageable);
+            return vendorRepository.findTopVendorsByCity(
+                    city,
+                    VendorStatus.ACTIVE,
+                    pageable
+            );
         }
 
-        return vendorRepository.findTopRankedVendors(pageable);
+        return vendorRepository.findTopRankedVendors(
+                VendorStatus.ACTIVE,
+                pageable
+        );
     }
 
     public Vendor getVendorById(UUID id) {
@@ -165,32 +164,12 @@ public class VendorService {
         return vendorRepository.save(vendor);
     }
 
-    private void updateProfileCompletion(Vendor vendor) {
-
-        int score = 0;
-
-        if (vendor.getBusinessName() != null) score += 10;
-        if (vendor.getDescription() != null) score += 15;
-        if (vendor.getTagline() != null) score += 5;
-        if (vendor.getLogoUrl() != null) score += 15;
-        if (vendor.getCoverBannerUrl() != null) score += 10;
-        if (vendor.getPhone() != null) score += 10;
-        if (vendor.getEmail() != null) score += 5;
-        if (vendor.getAddress() != null) score += 5;
-        if (vendor.getGoogleMapsLink() != null) score += 5;
-        if (vendor.getStartingPrice() != null) score += 10;
-        if (vendor.getAmenities() != null && !vendor.getAmenities().isEmpty()) score += 5;
-        if (vendor.getServiceSubtypes() != null && !vendor.getServiceSubtypes().isEmpty()) score += 5;
-
-        vendor.setProfileCompletionScore(score);
-    }
-
     @Scheduled(fixedRate = 3600000)
     @Transactional
     public void recalculateRankingScores() {
 
         log.info("Recalculating vendor ranking scores...");
-        vendorRepository.updateAllRankingScores();
+        vendorRepository.updateAllRankingScores(VendorStatus.ACTIVE);
         log.info("Ranking scores updated");
     }
 
@@ -207,5 +186,18 @@ public class VendorService {
                 "profileCompletion", vendor.getProfileCompletionScore(),
                 "rankingScore", vendor.getOverallRankingScore()
         );
+    }
+
+    private void updateProfileCompletion(Vendor vendor) {
+
+        int score = 0;
+
+        if (vendor.getBusinessName() != null) score += 10;
+        if (vendor.getDescription() != null) score += 15;
+        if (vendor.getTagline() != null) score += 5;
+        if (vendor.getPhone() != null) score += 10;
+        if (vendor.getEmail() != null) score += 5;
+
+        vendor.setProfileCompletionScore(score);
     }
 }
