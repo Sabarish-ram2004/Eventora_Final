@@ -4,14 +4,13 @@ import com.eventora.exception.EventoraException;
 import com.eventora.model.ServiceCategory;
 import com.eventora.model.User;
 import com.eventora.model.Vendor;
+import com.eventora.model.enums.VendorStatus;
 import com.eventora.repository.ServiceCategoryRepository;
 import com.eventora.repository.UserRepository;
 import com.eventora.repository.VendorRepository;
-import com.eventora.model.enums.VendorStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +39,21 @@ public class VendorService {
 
         String categorySlug = (String) data.get("categorySlug");
 
+        if (categorySlug == null || categorySlug.isBlank()) {
+            throw EventoraException.badRequest("Category is required");
+        }
+
         ServiceCategory category = categoryRepository.findBySlug(categorySlug)
                 .orElseThrow(() -> EventoraException.notFound("Invalid category"));
+
+        BigDecimal startingPrice = null;
+        try {
+            if (data.get("startingPrice") != null) {
+                startingPrice = new BigDecimal(data.get("startingPrice").toString());
+            }
+        } catch (Exception e) {
+            throw EventoraException.badRequest("Invalid starting price");
+        }
 
         Vendor vendor = Vendor.builder()
                 .user(user)
@@ -55,33 +67,11 @@ public class VendorService {
                 .city((String) data.get("city"))
                 .pincode((String) data.get("pincode"))
                 .googleMapsLink((String) data.get("googleMapsLink"))
-                .startingPrice(data.get("startingPrice") != null
-                        ? new BigDecimal(data.get("startingPrice").toString())
-                        : null)
+                .startingPrice(startingPrice)
                 .amenities((List<String>) data.getOrDefault("amenities", new ArrayList<>()))
                 .serviceSubtypes((List<String>) data.getOrDefault("serviceSubtypes", new ArrayList<>()))
                 .status(VendorStatus.PENDING_APPROVAL)
                 .build();
-
-        updateProfileCompletion(vendor);
-
-        return vendorRepository.save(vendor);
-    }
-
-    @Transactional
-    public Vendor updateVendorProfile(UUID vendorId, Map<String, Object> data) {
-
-        Vendor vendor = vendorRepository.findById(vendorId)
-                .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
-
-        if (data.containsKey("businessName")) vendor.setBusinessName((String) data.get("businessName"));
-        if (data.containsKey("tagline")) vendor.setTagline((String) data.get("tagline"));
-        if (data.containsKey("description")) vendor.setDescription((String) data.get("description"));
-        if (data.containsKey("phone")) vendor.setPhone((String) data.get("phone"));
-        if (data.containsKey("email")) vendor.setEmail((String) data.get("email"));
-        if (data.containsKey("address")) vendor.setAddress((String) data.get("address"));
-        if (data.containsKey("city")) vendor.setCity((String) data.get("city"));
-        if (data.containsKey("pincode")) vendor.setPincode((String) data.get("pincode"));
 
         updateProfileCompletion(vendor);
 
@@ -97,30 +87,27 @@ public class VendorService {
             int page,
             int size) {
 
-    Pageable pageable = PageRequest.of(page, size);
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? 10 : size;
 
-    // 🔥 TEMP DEBUG — remove custom JPQL filter
-    return vendorRepository.findAll(pageable);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
 
+        ServiceCategory category = null;
 
-        // Pageable pageable = PageRequest.of(page, size);
+        if (categorySlug != null && !categorySlug.isBlank()) {
+            category = categoryRepository.findBySlug(categorySlug)
+                    .orElseThrow(() -> EventoraException.notFound("Category not found"));
+        }
 
-        // ServiceCategory category = null;
-
-        // if (categorySlug != null && !categorySlug.isBlank()) {
-        //     category = categoryRepository.findBySlug(categorySlug)
-        //             .orElseThrow(() -> EventoraException.notFound("Category not found"));
-        // }
-
-        // return vendorRepository.findVendorsWithFilters(
-        //         category,
-        //         city,
-        //         minPrice,
-        //         maxPrice,
-        //         minRating,
-        //         VendorStatus.ACTIVE,
-        //         pageable
-        // );
+        return vendorRepository.findVendorsWithFilters(
+                category,
+                city,
+                minPrice,
+                maxPrice,
+                minRating,
+                VendorStatus.ACTIVE,
+                pageable
+        );
     }
 
     public List<Vendor> getTopVendors(String city, int limit) {
@@ -128,17 +115,10 @@ public class VendorService {
         Pageable pageable = PageRequest.of(0, limit);
 
         if (city != null && !city.isBlank()) {
-            return vendorRepository.findTopVendorsByCity(
-                    city,
-                    VendorStatus.ACTIVE,
-                    pageable
-            );
+            return vendorRepository.findTopVendorsByCity(city, VendorStatus.ACTIVE, pageable);
         }
 
-        return vendorRepository.findTopRankedVendors(
-                VendorStatus.ACTIVE,
-                pageable
-        );
+        return vendorRepository.findTopRankedVendors(VendorStatus.ACTIVE, pageable);
     }
 
     public Vendor getVendorById(UUID id) {
@@ -146,9 +126,19 @@ public class VendorService {
                 .orElseThrow(() -> EventoraException.notFound("Vendor not found"));
     }
 
-    public Vendor getVendorByUserId(UUID userId) {
-        return vendorRepository.findByUserId(userId)
-                .orElseThrow(() -> EventoraException.notFound("Vendor profile not found"));
+    public Map<String, Object> getVendorStats(UUID vendorId) {
+
+        Vendor vendor = getVendorById(vendorId);
+
+        return Map.of(
+                "avgRating", vendor.getAvgRating(),
+                "totalReviews", vendor.getTotalReviews(),
+                "totalBookings", vendor.getTotalBookings(),
+                "successfulBookings", vendor.getSuccessfulBookings(),
+                "wishlistCount", vendor.getWishlistCount(),
+                "profileCompletion", vendor.getProfileCompletionScore(),
+                "rankingScore", vendor.getOverallRankingScore()
+        );
     }
 
     @Transactional
@@ -168,30 +158,6 @@ public class VendorService {
         vendor.setStatus(VendorStatus.REJECTED);
 
         return vendorRepository.save(vendor);
-    }
-
-    @Scheduled(fixedRate = 3600000)
-    @Transactional
-    public void recalculateRankingScores() {
-
-        log.info("Recalculating vendor ranking scores...");
-        vendorRepository.updateAllRankingScores(VendorStatus.ACTIVE);
-        log.info("Ranking scores updated");
-    }
-
-    public Map<String, Object> getVendorStats(UUID vendorId) {
-
-        Vendor vendor = getVendorById(vendorId);
-
-        return Map.of(
-                "avgRating", vendor.getAvgRating(),
-                "totalReviews", vendor.getTotalReviews(),
-                "totalBookings", vendor.getTotalBookings(),
-                "successfulBookings", vendor.getSuccessfulBookings(),
-                "wishlistCount", vendor.getWishlistCount(),
-                "profileCompletion", vendor.getProfileCompletionScore(),
-                "rankingScore", vendor.getOverallRankingScore()
-        );
     }
 
     private void updateProfileCompletion(Vendor vendor) {
